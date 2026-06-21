@@ -1,28 +1,28 @@
+/*** includes ***/
+
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
-
 #include <stdlib.h>
 #include <termios.h>
 #include <unistd.h>
 
+/*** data ***/
 
 struct termios orig_termios;
+
+/*** terminal ***/
 
 void die(const char *s) {
   perror(s);
   exit(1);
 }
 
-
-
-
 void disableRawMode(){
   if  (tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios) == -1)
      /* TCSAFLUSH espera input pendente e descarta oq n foi lido; re-limpa terminal quando volta pro estado original */
       die("tcsetattr");
 }
-
 
 void enableRawMode() {
 
@@ -46,6 +46,8 @@ void enableRawMode() {
                                                                            Limpa oq tiver no buffer~antes de read() */
 
 }
+
+/*** init ***/
 
 int main () { 
   enableRawMode();
