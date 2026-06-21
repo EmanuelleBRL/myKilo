@@ -1,5 +1,7 @@
 #include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
+
 #include <stdlib.h>
 #include <termios.h>
 #include <unistd.h>
@@ -7,17 +9,24 @@
 
 struct termios orig_termios;
 
+void die(const char *s) {
+  perror(s);
+  exit(1);
+}
+
+
+
+
 void disableRawMode(){
-  tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
-} /* TCSAFLUSH espera input pendente e descarta oq n foi lido; re-limpa terminal quando volta pro estado original */
-
-
-
+  if  (tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios) == -1)
+     /* TCSAFLUSH espera input pendente e descarta oq n foi lido; re-limpa terminal quando volta pro estado original */
+      die("tcsetattr");
+}
 
 
 void enableRawMode() {
 
-  tcgetattr(STDIN_FILENO, &orig_termios); /* Read currient attriutes into a struct */
+  if ( tcgetattr(STDIN_FILENO, &orig_termios) == -1) (die("tcgetattr")); /* Read currient attriutes into a struct */
 
   atexit(disableRawMode); /* Chama função pra quando retornar do main ou qnd exit(); 
                             Ta dentro de enableRaw pq é quem gerencia o estado */
@@ -29,12 +38,12 @@ void enableRawMode() {
   raw.c_oflag &= ~(OPOST);
   raw.c_cflag |= (CS8);
   raw.c_lflag &= ~(ECHO | ICANON | ISIG | IEXTEN );   /* Modifica strutc ~termios (pré-definida) pra desligar ECHO
-                                       Off canonmode ~ readingg byte-by-byte instead of line-by-line~ */
+                                                         Off canonmode ~ readingg byte-by-byte instead of line-by-line~ */
   raw.c_cc[VMIN] = 0;
   raw.c_cc[VTIME] = 1;
   
-  tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw); /* Aplica mudança do echo no terminal atual; 
-                                               Limpa oq tiver no buffer~antes de read() */
+  if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) die("tcsetattr"); /* Aplica mudança do echo no terminal atual; 
+                                                                           Limpa oq tiver no buffer~antes de read() */
 
 }
 
@@ -43,7 +52,7 @@ int main () {
   
   while (1){
     char c = '\0';
-    read(STDIN_FILENO, &c, 1); 
+    if (read(STDIN_FILENO, &c, 1) == -1 && errno != EAGAIN) die ("read"); 
     if (iscntrl(c)){        /* Se for ctrl + algo, exibe apenas ASCII e não o comando 
                                (qnd o terminal lẽ o char do comando, executa ele) */
       printf("%d\r\n", c);
