@@ -55,25 +55,39 @@ void enableRawMode() {
 
 }
 
+
+char editorReadKey() {
+  int nread;
+  char c;
+  while((nread= read(STDIN_FILENO, &c, 1)) != -1){ /** Pega o valor retornado por read e compara;
+                                                       Mantem rodando sempre que estiver recebendo bytes;
+                                                       Se der -1 (read retornar por erro), mata programa com msg err
+                                                       Ta em *terminal* pq lida com low-level input **/
+    if (nread == -1 && errno != EAGAIN) die ("read");
+  }
+  return c;
+}
+
+/*** input ***/
+
+void editorProcessKeypress() {
+  char c = editorReadKey();
+
+  switch (c) {
+    case CTRL_KEY('q'):
+      exit(0);
+      break;
+  }
+}
+
 /*** init ***/
 
 int main () { 
   enableRawMode();
   
   while (1){
-    char c = '\0';
-    if (read(STDIN_FILENO, &c, 1) == -1 && errno != EAGAIN) die ("read"); 
-    if (iscntrl(c)){        /* Se for ctrl + algo, exibe apenas ASCII e não o comando 
-                               (qnd o terminal lẽ o char do comando, executa ele) */
-      printf("%d\r\n", c);
-    } else {
-      printf("%d ('%c')\r\n", c, c);
-    }
-    if (c == CTRL_KEY('q')) break;
-    }
+   editorProcessKeypress(); 
+  }
 
-
-
-  
   return 0;}
 
