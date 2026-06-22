@@ -7,6 +7,14 @@
 #include <termios.h>
 #include <unistd.h>
 
+
+/*** defines ***/
+
+#define CTRL_KEY(k) ((k) & 0x1f) /* Aplica bitwise-AND 00011111.
+                                   Isso faz com que os 3 bits superiores do char se tornem 0.
+                                   ASCII foi feita de modo que cada char se encaixe a isso */
+
+
 /*** data ***/
 
 struct termios orig_termios;
@@ -61,7 +69,7 @@ int main () {
     } else {
       printf("%d ('%c')\r\n", c, c);
     }
-    if (c == 'q') break;
+    if (c == CTRL_KEY('q')) break;
     }
 
 
