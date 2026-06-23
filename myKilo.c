@@ -17,33 +17,38 @@
 
 /*** data ***/
 
-struct termios orig_termios;
+struct editorConfig {  /** Organizar variaveis globais relacionadas às configurações do editor **/
+  struct termios orig_termios;
+
+};
+
+struct editorConfig E;
 
 /*** terminal ***/
 
 void die(const char *s) {
-  write(STDOUT_FILENO, "\x1b[2J", 4);
-  write(STDOUT_FILENO, "\x1b[H", 3); 
+  write(STDOUT_FILENO, "\x1b[2J", 4); /* Age como ctrl l (não /clear!) **/
+  write(STDOUT_FILENO, "\x1b[H", 3);  /* Retorna positção do cursor à coordenada 1,1 do tamanho do terminal */
 
   perror(s);
   exit(1);
 }
 
 void disableRawMode(){
-  if  (tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios) == -1)
+  if  (tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_termios) == -1)
      /* TCSAFLUSH espera input pendente e descarta oq n foi lido; re-limpa terminal quando volta pro estado original */
       die("tcsetattr");
 }
 
 void enableRawMode() {
 
-  if ( tcgetattr(STDIN_FILENO, &orig_termios) == -1) (die("tcgetattr")); /* Read currient attriutes into a struct */
+  if ( tcgetattr(STDIN_FILENO, &E.orig_termios) == -1) (die("tcgetattr")); /* Read currient attriutes into a struct & error handling*/
 
   atexit(disableRawMode); /* Chama função pra quando retornar do main ou qnd exit(); 
                             Ta dentro de enableRaw pq é quem gerencia o estado */
 
 
-  struct termios raw = orig_termios; // Copia estado atual do terminal para raw
+  struct termios raw = E.orig_termios; // Copia estado atual do terminal para raw
 
   raw.c_iflag &= ~( BRKINT | ICRNL | INPCK | IXON );
   raw.c_oflag &= ~(OPOST);
@@ -76,16 +81,16 @@ char editorReadKey() {
 void editorDrawRows() {
   int y;
   for (y = 0; y < 24; y++) {
-    write(STDOUT_FILENO, "~\r\n", 3);
+    write(STDOUT_FILENO, "~\r\n", 3); /** Faz ~, pula linha e volta cursor 24 vezes **/
   }
 }
 void editorRefreshScreen() {          /** Escape Sequences do VT100**/
-  write(STDOUT_FILENO, "\x1b[2J", 4); /* Age como ctrl l (não /clear!) */
+  write(STDOUT_FILENO, "\x1b[2J", 4); /* Age como ctrl l (não /clear!) -limpa terminal ao entrar */
   write(STDOUT_FILENO, "\x1b[H", 3); /* Retorna positção do cursor à coordenada 1,1 do tamanho do terminal */
 
   editorDrawRows();
 
-  write(STDIN_FILENO, "\x1b[H", 3);
+  write(STDIN_FILENO, "\x1b[H", 3); /** Retorna posição cursos à coordenada 1,1 **/
 
 }
 
