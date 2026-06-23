@@ -73,9 +73,19 @@ char editorReadKey() {
 
 /*** output ***/
 
+void editorDrawRows() {
+  int y;
+  for (y = 0; y < 24; y++) {
+    write(STDOUT_FILENO, "~\r\n", 3);
+  }
+}
 void editorRefreshScreen() {          /** Escape Sequences do VT100**/
   write(STDOUT_FILENO, "\x1b[2J", 4); /* Age como ctrl l (não /clear!) */
   write(STDOUT_FILENO, "\x1b[H", 3); /* Retorna positção do cursor à coordenada 1,1 do tamanho do terminal */
+
+  editorDrawRows();
+
+  write(STDIN_FILENO, "\x1b[H", 3);
 
 }
 
