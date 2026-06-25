@@ -70,11 +70,14 @@ void enableRawMode() {
 char editorReadKey() {
   int nread;
   char c;
-  while((nread= read(STDIN_FILENO, &c, 1)) != -1){ /** Pega o valor retornado por read e compara;
-                                                       Mantem rodando sempre que estiver recebendo bytes;
-                                                       Se der -1 (read retornar por erro), mata programa com msg err
-                                                       Ta em *terminal* pq lida com low-level input **/
-    if (nread == -1 && errno != EAGAIN) die ("read");
+  while((nread= read(STDIN_FILENO, &c, 1)) != 1){ /** Pega o valor retornado por read e compara;
+                                                      Mantém rodando enquanto não receber bytes;
+                                                      Recebe 1 byte, loop quebra e função retorna;
+                                                      Ta em *terminal* pq lida com low-level input **/
+
+
+
+    if (nread == -1 && errno != EAGAIN) die ("read"); // Se der -1 (read retornar por erro), mata programa com mensagem err
   }
   return c;
 }
