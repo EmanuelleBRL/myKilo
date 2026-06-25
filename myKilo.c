@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -17,16 +18,18 @@
 
 /*** data ***/
 
-struct editorConfig {  /** Organizar variaveis globais relacionadas às configurações do editor **/
-  struct termios orig_termios;
+struct editorConfig {  /** Organizar variaveis globais relacionadas ào estado do editor **/
+  int screenrows;
+  int screencols;
+  struct termios orig_termios; // Guarda configurações originais do terminal
 
 };
 
-struct editorConfig E;
+struct editorConfig E; /** Variável Global (fora de qualquer função). Nasce automaticamente com zeros **/
 
 /*** terminal ***/
 
-void die(const char *s) {
+void die(const char *s) { /** Limpar a tela e exibir erro(especifico) antes de morrer **/
   write(STDOUT_FILENO, "\x1b[2J", 4); /* Age como ctrl l (não /clear!) **/
   write(STDOUT_FILENO, "\x1b[H", 3);  /* Retorna positção do cursor à coordenada 1,1 do tamanho do terminal */
 
@@ -35,9 +38,9 @@ void die(const char *s) {
 }
 
 void disableRawMode(){
-  if  (tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_termios) == -1)
-     /* TCSAFLUSH espera input pendente e descarta oq n foi lido; re-limpa terminal quando volta pro estado original */
-      die("tcsetattr");
+  if  (tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_termios) == -1) /* TCSAFLUSH espera output pendente e descarta oq n foi lido do inputbuffer; */ 
+      die("tcsetattr"); /* Re-limpa terminal quando volta pro estado original */
+
 }
 
 void enableRawMode() {
@@ -76,11 +79,28 @@ char editorReadKey() {
   return c;
 }
 
+
+int getWindowSize(int *rows, int *cols){
+  struct winsize ws;
+
+  if (ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0){ /** Função que pega tamanho do terminal 
+                                                                        || ws.ws_col == 0 -> caso o terminal bug faço divisão por zero **/
+    return  -1;
+  } else {
+    *cols = ws.ws_col; // Passagem por referência > ponteiros
+    *rows = ws.ws_row;
+    return 0;
+  }
+}
+
+
+
+
 /*** output ***/
 
 void editorDrawRows() {
   int y;
-  for (y = 0; y < 24; y++) {
+  for (y = 0; y < E.screenrows; y++) {
     write(STDOUT_FILENO, "~\r\n", 3); /** Faz ~, pula linha e volta cursor 24 vezes **/
   }
 }
@@ -111,8 +131,17 @@ void editorProcessKeypress() {
 
 /*** init ***/
 
+void initEditor(){  /** Inicializar todos os membros da struct E -e validar- **/
+  if (getWindowSize(&E.screenrows, &E.screencols) == -1) die("getWindowSize"); /** Fluxo: Função é chamada e inicializada > Retorna x > If entra em cena;
+                                                                                   Ps: Ler precedência de operadores 
+                                                                                   ~orig_termios é inicializado em enableRawMode**/
+
+}
+
+
 int main () { 
   enableRawMode();
+  initEditor();
   
   while (1){
    editorRefreshScreen();
