@@ -82,9 +82,17 @@ char editorReadKey() {
 
 int getWindowSize(int *rows, int *cols){
   struct winsize ws;
+  if (1 ||ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0){ /** Função que pega tamanho do terminal 
+                                                                             || ws.ws_col == 0 -> caso o terminal bug (fazendo divisão por zero)
+                                                                             '1' para teste  **/
 
-  if (ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0){ /** Função que pega tamanho do terminal 
-                                                                        || ws.ws_col == 0 -> caso o terminal bug faço divisão por zero **/
+    if(write(STDERR_FILENO, "\x1b[999C\x1b[999B", 12) != 12) return -1; /** Caso ioctl dê erro, faz manual, jogando cursor para frente e para baixo até travar no fim da tela; 
+                                                                            ESC [ C -> Cursor Forward
+                                                                            ESC [ B -> Cursor Down 
+                                                                            ESC [ H -> Não funciona porque doc não especifica o que acontece caso o cursor se mova off screen (ficando a critério do 
+                                                                            emulador de terminal e descentralizando controle) **/
+    editorReadKey(); // Pausa antes de ir pro die() no initEditor()
+
     return  -1;
   } else {
     *cols = ws.ws_col; // Passagem por referência > ponteiros
@@ -101,7 +109,7 @@ int getWindowSize(int *rows, int *cols){
 void editorDrawRows() {
   int y;
   for (y = 0; y < E.screenrows; y++) {
-    write(STDOUT_FILENO, "~\r\n", 3); /** Faz ~, pula linha e volta cursor 24 vezes **/
+    write(STDOUT_FILENO, "~\r\n", 3); /** Faz ~, pula linha e volta cursor E.screebrows vezes **/
   }
 }
 void editorRefreshScreen() {          /** Escape Sequences do VT100**/
