@@ -73,7 +73,7 @@ char editorReadKey() {
   while((nread= read(STDIN_FILENO, &c, 1)) != 1){ /* Pega o valor retornado por read e compara;
                                                      Mantém rodando enquanto não receber bytes;
                                                      Recebe 1 byte, loop quebra e função retorna;
-                                                     Ta em *terminal* pq lida com low-level input */
+                                                     Ta em *terminal* porque lida com low-level input */
 
 
 
@@ -83,22 +83,32 @@ char editorReadKey() {
 }
 
 int getCursorPosition(int *rows, int *cols){
+  char buf[32];
+  unsigned int i = 0; // Unsigned porque não tem como se ter -1 bytes
 
-  if(write(STDOUT_FILENO, "\x1b[6n", 4) != 4) return -1;
+  if(write(STDOUT_FILENO, "\x1b[6n", 4) != 4) return -1; /* Escape Sequence DSR (serve para chamar o CPR, que devolve posição atual do cursor);
+                                                            Manda para streamout; */ 
 
-  printf("\r\n");
+  while ( i < sizeof(buf) -1) /* Posição 30 do buffer para sobrar espaço pro null-terminator e detectar EOF no sscanf */
+                                 
+  {
+    if (read(STDIN_FILENO, &buf[i], 1) != 1) break; /* Lê STDIN, que contém a resposta do que o write() jogou no STDOUT ~CPR~, 1 byte por vez;
+                                                       Inicia guardando em buf[0]; */
 
-  char c;
-  while(read(STDOUT_FILENO, &c, 1) == 1 ){
-    if(iscntrl(c)){
-      printf("%d\r\n", c);
-    } else{
-      printf("%d ('%c')\r\n", c, c);
+    if (buf[i] == 'R') break; /* Termina ao chegar no último char do CPR */
+    i++;
   }
-}
-  editorReadKey();
 
-  return -1;
+  buf[i]= '\0'; // Acrescenta null-terminator no exato lugar onde a string acabou pro sscanf
+
+  if(buf[0] != '\x1b' || buf[1] != '[') return -1; // Error handling
+
+  if (sscanf(&buf[2], "%d;%d", rows, cols) != 2) return -1; /* Recebe a partir do terceiro byte;
+                                                               Desse array, usa o formato %d;%d para extrair os dois números do texto e ignorar o ponto e virgula 
+                                                               Guarda em rows, cols;
+                                                               Error handling */
+
+  return 0;  
 }
 
 int getWindowSize(int *rows, int *cols){
