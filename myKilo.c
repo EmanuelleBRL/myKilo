@@ -86,10 +86,10 @@ int getCursorPosition(int *rows, int *cols){
   char buf[32];
   unsigned int i = 0; // Unsigned porque não tem como se ter -1 bytes
 
-  if(write(STDOUT_FILENO, "\x1b[6n", 4) != 4) return -1; /* Escape Sequence DSR (serve para chamar o CPR, que devolve posição atual do cursor);
+  if (write(STDOUT_FILENO, "\x1b[6n", 4) != 4) return -1; /* Escape Sequence DSR (serve para chamar o CPR, que devolve posição atual do cursor);
                                                             Manda para streamout; */ 
 
-  while ( i < sizeof(buf) -1) /* Posição 30 do buffer para sobrar espaço pro null-terminator e detectar EOF no sscanf */
+  while ( i < sizeof(buf) -1) /* Menor que e penúltima posição buffer para sobrar espaço pro null-terminator e detectar EOF no sscanf */
                                  
   {
     if (read(STDIN_FILENO, &buf[i], 1) != 1) break; /* Lê STDIN, que contém a resposta do que o write() jogou no STDOUT ~CPR~, 1 byte por vez;
@@ -99,9 +99,10 @@ int getCursorPosition(int *rows, int *cols){
     i++;
   }
 
-  buf[i]= '\0'; // Acrescenta null-terminator no exato lugar onde a string acabou pro sscanf
+  buf[i]= '\0'; /* Acrescenta null-terminator no exato lugar onde a string acabou pro sscanf 
+                   -> Sabe o exato lugar por conta do incremento em i; */
 
-  if(buf[0] != '\x1b' || buf[1] != '[') return -1; // Error handling
+  if (buf[0] != '\x1b' || buf[1] != '[') return -1; // Error handling
 
   if (sscanf(&buf[2], "%d;%d", rows, cols) != 2) return -1; /* Recebe a partir do terceiro byte;
                                                                Desse array, usa o formato %d;%d para extrair os dois números do texto e ignorar o ponto e virgula 
@@ -117,7 +118,7 @@ int getWindowSize(int *rows, int *cols){
                                                                              || ws.ws_col == 0 -> caso o terminal bug (fazendo divisão por zero)
                                                                              '1' para teste do fallback **/
 
-    if(write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12) return -1; /** Caso ioctl dê erro, faz manual, jogando cursor para frente e para baixo até travar no fim da tela; **/
+    if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12) return -1; /** Caso ioctl dê erro, faz manual, jogando cursor para frente e para baixo até travar no fim da tela; **/
     return getCursorPosition(rows, cols);
                                                                             /** ESC [ C -> Cursor Forward
                                                                                 ESC [ B -> Cursor Down 
@@ -140,16 +141,23 @@ int getWindowSize(int *rows, int *cols){
 void editorDrawRows() {
   int y;
   for (y = 0; y < E.screenrows; y++) {
-    write(STDOUT_FILENO, "~\r\n", 3); /** Faz ~, pula linha e volta cursor E.screebrows vezes **/
+    write(STDOUT_FILENO, "~", 1); /** Faz ~, E.screebrows vezes **/
+  
+  if (y < E.screenrows -1) /* Quando estiver na penúltima linha, não vai fazer quebra de linha, impedindo o scroll para cima e a adição da linha em branco */
+    {
+      write(STDOUT_FILENO, "\r\n", 2);
+    }
   }
 }
+
+
 void editorRefreshScreen() {          /** Escape Sequences do VT100**/
   write(STDOUT_FILENO, "\x1b[2J", 4); /* Age como ctrl l (não /clear!) -limpa terminal ao entrar */
   write(STDOUT_FILENO, "\x1b[H", 3); /* Retorna posição do cursor à coordenada 1,1 do tamanho do terminal */
 
   editorDrawRows();
 
-  write(STDIN_FILENO, "\x1b[H", 3); /** Retorna posição cursor à coordenada 1,1 **/
+  write(STDOUT_FILENO, "\x1b[H", 3); /** Retorna posição cursor à coordenada 1,1 **/
 
 }
 
@@ -183,7 +191,7 @@ int main () {
   initEditor();
   
   while (1){
-   editorRefreshScreen();
+   editorRefreshScreen(); // No momento, desenha toda vez que lê tecla --> motivo de ficar multiplicando ~ no terminal (fazendo scroll up) -- \x1b[2J flickering
    editorProcessKeypress(); 
   }
 
