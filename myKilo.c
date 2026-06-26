@@ -18,7 +18,7 @@
 
 /*** data ***/
 
-struct editorConfig {  /** Organizar variaveis globais relacionadas ào estado do editor **/
+struct editorConfig {  /** Organizar variaveis globais relacionadas ao estado do editor **/
   int screenrows;
   int screencols;
   struct termios orig_termios; // Guarda configurações originais do terminal
@@ -45,7 +45,7 @@ void disableRawMode(){
 
 void enableRawMode() {
 
-  if ( tcgetattr(STDIN_FILENO, &E.orig_termios) == -1) (die("tcgetattr")); /* Read currient attriutes into a struct & error handling*/
+  if ( tcgetattr(STDIN_FILENO, &E.orig_termios) == -1) (die("tcgetattr")); /* Lê atributos atuais do terminal, põe na struct, error handling */
 
   atexit(disableRawMode); /* Chama função pra quando retornar do main ou qnd exit(); 
                             Ta dentro de enableRaw pq é quem gerencia o estado */
@@ -57,9 +57,9 @@ void enableRawMode() {
   raw.c_oflag &= ~(OPOST);
   raw.c_cflag |= (CS8);
   raw.c_lflag &= ~(ECHO | ICANON | ISIG | IEXTEN );   /* Modifica strutc ~termios (pré-definida) pra desligar ECHO
-                                                         Off canonmode ~ readingg byte-by-byte instead of line-by-line~ */
+                                                         Off canonmode ~reading byte-by-byte instead of line-by-line~ */
   raw.c_cc[VMIN] = 0;
-  raw.c_cc[VTIME] = 1;
+  raw.c_cc[VTIME] = 1; /* Terminal timout em décimos de segundo */
   
   if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) die("tcsetattr"); /* Aplica mudança do echo no terminal atual; 
                                                                            Limpa oq tiver no buffer~antes de read() */
@@ -70,10 +70,10 @@ void enableRawMode() {
 char editorReadKey() {
   int nread;
   char c;
-  while((nread= read(STDIN_FILENO, &c, 1)) != 1){ /** Pega o valor retornado por read e compara;
-                                                      Mantém rodando enquanto não receber bytes;
-                                                      Recebe 1 byte, loop quebra e função retorna;
-                                                      Ta em *terminal* pq lida com low-level input **/
+  while((nread= read(STDIN_FILENO, &c, 1)) != 1){ /* Pega o valor retornado por read e compara;
+                                                     Mantém rodando enquanto não receber bytes;
+                                                     Recebe 1 byte, loop quebra e função retorna;
+                                                     Ta em *terminal* pq lida com low-level input */
 
 
 
@@ -82,21 +82,39 @@ char editorReadKey() {
   return c;
 }
 
+int getCursorPosition(int *rows, int *cols){
+
+  if(write(STDOUT_FILENO, "\x1b[6n", 4) != 4) return -1;
+
+  printf("\r\n");
+
+  char c;
+  while(read(STDOUT_FILENO, &c, 1) == 1 ){
+    if(iscntrl(c)){
+      printf("%d\r\n", c);
+    } else{
+      printf("%d ('%c')\r\n", c, c);
+  }
+}
+  editorReadKey();
+
+  return -1;
+}
 
 int getWindowSize(int *rows, int *cols){
   struct winsize ws;
   if (1 ||ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0){ /** Função que pega tamanho do terminal 
                                                                              || ws.ws_col == 0 -> caso o terminal bug (fazendo divisão por zero)
-                                                                             '1' para teste  **/
+                                                                             '1' para teste do fallback **/
 
-    if(write(STDERR_FILENO, "\x1b[999C\x1b[999B", 12) != 12) return -1; /** Caso ioctl dê erro, faz manual, jogando cursor para frente e para baixo até travar no fim da tela; 
-                                                                            ESC [ C -> Cursor Forward
-                                                                            ESC [ B -> Cursor Down 
-                                                                            ESC [ H -> Não funciona porque doc não especifica o que acontece caso o cursor se mova off screen (ficando a critério do 
-                                                                            emulador de terminal e descentralizando controle) **/
-    editorReadKey(); // Pausa antes de ir pro die() no initEditor()
+    if(write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12) return -1; /** Caso ioctl dê erro, faz manual, jogando cursor para frente e para baixo até travar no fim da tela; **/
+    return getCursorPosition(rows, cols);
+                                                                            /** ESC [ C -> Cursor Forward
+                                                                                ESC [ B -> Cursor Down 
+                                                                                ESC [ H -> Não funciona porque doc não especifica o que acontece caso o cursor se mova off screen (ficando a critério do 
+                                                                                emulador de terminal e descentralizando controle) **/
 
-    return  -1;
+    
   } else {
     *cols = ws.ws_col; // Passagem por referência > ponteiros
     *rows = ws.ws_row;
@@ -117,11 +135,11 @@ void editorDrawRows() {
 }
 void editorRefreshScreen() {          /** Escape Sequences do VT100**/
   write(STDOUT_FILENO, "\x1b[2J", 4); /* Age como ctrl l (não /clear!) -limpa terminal ao entrar */
-  write(STDOUT_FILENO, "\x1b[H", 3); /* Retorna positção do cursor à coordenada 1,1 do tamanho do terminal */
+  write(STDOUT_FILENO, "\x1b[H", 3); /* Retorna posição do cursor à coordenada 1,1 do tamanho do terminal */
 
   editorDrawRows();
 
-  write(STDIN_FILENO, "\x1b[H", 3); /** Retorna posição cursos à coordenada 1,1 **/
+  write(STDIN_FILENO, "\x1b[H", 3); /** Retorna posição cursor à coordenada 1,1 **/
 
 }
 
@@ -142,7 +160,7 @@ void editorProcessKeypress() {
 
 /*** init ***/
 
-void initEditor(){  /** Inicializar todos os membros da struct E -e validar- **/
+void initEditor(){  /** Inicializar todos os membros -menos o orig_termios- da struct E -e validar- **/
   if (getWindowSize(&E.screenrows, &E.screencols) == -1) die("getWindowSize"); /** Fluxo: Função é chamada e inicializada > Retorna x > If entra em cena;
                                                                                    Ps: Ler precedência de operadores 
                                                                                    ~orig_termios é inicializado em enableRawMode**/
