@@ -89,10 +89,10 @@ int getCursorPosition(int *rows, int *cols){
   if (write(STDOUT_FILENO, "\x1b[6n", 4) != 4) return -1; /* Escape Sequence DSR (serve para chamar o CPR, que devolve posição atual do cursor);
                                                             Manda para streamout; */ 
 
-  while ( i < sizeof(buf) -1) /* Menor que e penúltima posição buffer para sobrar espaço pro null-terminator e detectar EOF no sscanf */
+  while ( i < sizeof(buf) -1) /* Menor que e penúltima posição buffer para sobrar espaço pro null-terminator e indicar fim da string pro sscanf */
                                  
   {
-    if (read(STDIN_FILENO, &buf[i], 1) != 1) break; /* Lê STDIN, que contém a resposta do que o write() jogou no STDOUT ~CPR~, 1 byte por vez;
+    if (read(STDIN_FILENO, &buf[i], 1) != 1) break; /* Lê do STDIN, que contém a resposta do que o write() perguntou (e que o terminal processou e injetou no STDOUT ~CPR~), 1 byte por vez;
                                                        Inicia guardando em buf[0]; */
 
     if (buf[i] == 'R') break; /* Termina ao chegar no último char do CPR */
@@ -115,7 +115,7 @@ int getCursorPosition(int *rows, int *cols){
 int getWindowSize(int *rows, int *cols){
   struct winsize ws;
   if (1 ||ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0){ /** Função que pega tamanho do terminal 
-                                                                             || ws.ws_col == 0 -> caso o terminal bug (fazendo divisão por zero)
+                                                                             || ws.ws_col == 0 -> caso ioctl retorne 0 mas falhe em preencher a struct, devolvendo dimensões erradas
                                                                              '1' para teste do fallback **/
 
     if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12) return -1; /** Caso ioctl dê erro, faz manual, jogando cursor para frente e para baixo até travar no fim da tela; **/
@@ -141,7 +141,7 @@ int getWindowSize(int *rows, int *cols){
 void editorDrawRows() {
   int y;
   for (y = 0; y < E.screenrows; y++) {
-    write(STDOUT_FILENO, "~", 1); /** Faz ~, E.screebrows vezes **/
+    write(STDOUT_FILENO, "~", 1); /** Faz ~, E.screenrows vezes **/
   
   if (y < E.screenrows -1) /* Quando estiver na penúltima linha, não vai fazer quebra de linha, impedindo o scroll para cima e a adição da linha em branco */
     {
